@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ensure text is always visible with fallback styles */
+* {
+  color: inherit;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  
+  body {
+    background-color: #000000;
+    color: #ffffff !important; /* Force white text */
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  
+  /* Fallback for any elements that might lose text color */
+  h1, h2, h3, h4, h5, h6, p, span, div {
+    color: #ffffff !important;
+  }
+}
+
+@layer components {
+  .chat-message-user {
+    @apply bg-zinc-800 text-white rounded-xl px-4 py-3 ml-8;
+  }
+  
+  .chat-message-ai {
+    @apply bg-zinc-900 text-gray-200 rounded-xl px-4 py-3 mr-8;
+  }
+  
+  .sidebar-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
