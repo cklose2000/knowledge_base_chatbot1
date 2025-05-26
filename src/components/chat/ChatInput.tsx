@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Send, Plus, Upload } from 'lucide-react';
+import { Send, Plus, Upload, ChevronRight, Grid3X3, Camera, FileText, Cloud, Folder, ChevronLeft } from 'lucide-react';
 import { useChatStore } from '../../store/chatStore';
 
 export const ChatInput: React.FC = () => {
   const [message, setMessage] = useState('');
   const [showIntegrations, setShowIntegrations] = useState(false);
+  const [showConnectApps, setShowConnectApps] = useState(false);
   const { addMessage, isLoading } = useChatStore();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,15 +42,66 @@ export const ChatInput: React.FC = () => {
 
   const toggleIntegrations = () => {
     setShowIntegrations(prev => !prev);
+    setShowConnectApps(false); // Reset submenu when closing
   };
 
-  const integrations = [
-    { name: 'Upload File/Photo', color: 'bg-gray-500', icon: <Upload size={16} /> },
-    { name: 'Google Drive', color: 'bg-blue-500', icon: '📄' },
-    { name: 'OneDrive', color: 'bg-orange-500', icon: '📁' },
-    { name: 'Dropbox', color: 'bg-blue-600', icon: '📦' },
-    { name: 'Salesforce', color: 'bg-blue-700', icon: '☁️' },
-    { name: 'SharePoint', color: 'bg-blue-800', icon: '🗂️' },
+  const handleConnectAppsClick = () => {
+    setShowConnectApps(true);
+  };
+
+  const handleBackToMain = () => {
+    setShowConnectApps(false);
+  };
+
+  const allIntegrations = [
+    { 
+      name: 'Google Drive', 
+      icon: <div className="w-4 h-4 bg-blue-500 rounded-sm flex items-center justify-center text-white text-xs font-bold">G</div>,
+      description: 'Access your Google Drive files'
+    },
+    { 
+      name: 'Microsoft OneDrive', 
+      icon: <div className="w-4 h-4 bg-blue-600 rounded-sm flex items-center justify-center text-white text-xs">📁</div>,
+      description: 'Connect to OneDrive for Business'
+    },
+    { 
+      name: 'SharePoint', 
+      icon: <div className="w-4 h-4 bg-blue-700 rounded-sm flex items-center justify-center text-white text-xs">📊</div>,
+      description: 'Access SharePoint documents'
+    },
+    { 
+      name: 'Dropbox', 
+      icon: <div className="w-4 h-4 bg-blue-600 rounded-sm flex items-center justify-center text-white text-xs">📦</div>,
+      description: 'Connect to your Dropbox files'
+    },
+    { 
+      name: 'Box', 
+      icon: <div className="w-4 h-4 bg-blue-500 rounded-sm flex items-center justify-center text-white text-xs">📁</div>,
+      description: 'Access Box cloud storage'
+    },
+    { 
+      name: 'Salesforce', 
+      icon: <div className="w-4 h-4 bg-blue-700 rounded-sm flex items-center justify-center text-white text-xs">☁️</div>,
+      description: 'Connect to Salesforce data'
+    },
+    { 
+      name: 'Network Drives', 
+      icon: <Folder className="w-4 h-4 text-gray-400" />,
+      description: 'Access local network drives'
+    },
+  ];
+
+  const fileActions = [
+    { 
+      name: 'Add from Microsoft OneDrive (personal)', 
+      icon: <Cloud className="w-4 h-4 text-blue-500" />,
+      description: null
+    },
+    { 
+      name: 'Add photos and files', 
+      icon: <Camera className="w-4 h-4 text-gray-400" />,
+      description: null
+    },
   ];
 
   return (
@@ -57,29 +109,83 @@ export const ChatInput: React.FC = () => {
       <div className="max-w-4xl mx-auto p-4">
         {/* Integration Options - shown when + is clicked */}
         {showIntegrations && (
-          <div className="mb-4 p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Connect to your data sources</h3>
-            <div className="flex flex-wrap gap-2">
-              {integrations.map((integration) => (
+          <div className="mb-4 p-1 bg-zinc-800 rounded-xl border border-zinc-700 shadow-lg">
+            {!showConnectApps ? (
+              // Main menu
+              <>
+                {/* Connect apps section */}
+                <div className="px-3 py-2">
+                  <button
+                    className="w-full flex items-center justify-between text-sm text-gray-300 mb-2 px-2 py-2 hover:bg-zinc-700 rounded-lg transition-colors"
+                    onClick={handleConnectAppsClick}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Grid3X3 className="w-4 h-4" />
+                      <span>Connect apps</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Separator */}
+                <div className="border-t border-zinc-700 my-1"></div>
+
+                {/* File actions section */}
+                <div className="px-3 py-2">
+                  {fileActions.map((action) => (
+                    <button
+                      key={action.name}
+                      className="w-full flex items-center gap-3 px-2 py-2 hover:bg-zinc-700 rounded-lg transition-colors text-left"
+                      onClick={() => {
+                        console.log(`Action: ${action.name}`);
+                        setShowIntegrations(false);
+                      }}
+                    >
+                      {action.icon}
+                      <div className="flex-1">
+                        <div className="text-white text-sm">{action.name}</div>
+                        {action.description && (
+                          <div className="text-gray-400 text-xs">{action.description}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              // Connect apps submenu
+              <div className="px-3 py-2">
+                {/* Back button */}
                 <button
-                  key={integration.name}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 hover:text-white text-sm rounded-lg transition-colors"
-                  onClick={() => {
-                    console.log(`Connecting to ${integration.name}`);
-                    setShowIntegrations(false);
-                  }}
+                  className="w-full flex items-center gap-2 text-sm text-gray-300 mb-3 px-2 py-2 hover:bg-zinc-700 rounded-lg transition-colors"
+                  onClick={handleBackToMain}
                 >
-                  <span className="text-sm">{integration.icon}</span>
-                  {integration.name}
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Connect apps</span>
                 </button>
-              ))}
-            </div>
-            <button 
-              className="mt-2 text-xs text-zinc-400 hover:text-zinc-300"
-              onClick={() => setShowIntegrations(false)}
-            >
-              Cancel
-            </button>
+                
+                {/* All integrations */}
+                {allIntegrations.map((integration) => (
+                  <button
+                    key={integration.name}
+                    className="w-full flex items-center gap-3 px-2 py-2 hover:bg-zinc-700 rounded-lg transition-colors text-left"
+                    onClick={() => {
+                      console.log(`Connecting to ${integration.name}`);
+                      setShowIntegrations(false);
+                      setShowConnectApps(false);
+                    }}
+                  >
+                    {integration.icon}
+                    <div className="flex-1">
+                      <div className="text-white text-sm">{integration.name}</div>
+                      {integration.description && (
+                        <div className="text-gray-400 text-xs">{integration.description}</div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         
