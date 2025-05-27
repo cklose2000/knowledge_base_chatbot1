@@ -32,14 +32,14 @@ export const MessageList: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {messages.map((message) => (
           <Message key={message.id} message={message} />
         ))}
         
         {isLoading && (
           <div className="flex justify-start mb-6">
-            <div className="max-w-[70%]">
+            <div className="max-w-[85%]">
               <div className="bg-zinc-900 text-gray-200 rounded-xl px-4 py-3 mr-8">
                 <div className="flex items-center gap-2">
                   <div className="flex space-x-1">

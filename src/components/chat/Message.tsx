@@ -19,7 +19,7 @@ export const Message: React.FC<MessageProps> = ({ message }) => {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
-      <div className={`max-w-[70%] ${isUser ? 'order-2' : ''}`}>
+      <div className={`max-w-[85%] ${isUser ? 'order-2' : ''}`}>
         <div className={`
           px-4 py-3 rounded-xl
           ${isUser 
