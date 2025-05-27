@@ -1,6 +1,7 @@
 import React from 'react';
-import { Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut, RotateCcw } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useChatStore } from '../../store/chatStore';
 import { Button } from '../ui/Button';
 
 interface HeaderProps {
@@ -9,9 +10,14 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const { logout, username } = useAuthStore();
+  const { clearMessages } = useChatStore();
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleClearChat = () => {
+    clearMessages();
   };
 
   return (
@@ -30,6 +36,15 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       
       <div className="flex items-center gap-3">
         <span className="text-sm text-gray-400">Welcome, {username}</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={RotateCcw}
+          onClick={handleClearChat}
+          title="Clear current chat"
+        >
+          Clear Chat
+        </Button>
         <Button
           variant="ghost"
           size="sm"

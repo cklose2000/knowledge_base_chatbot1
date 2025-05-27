@@ -22,3 +22,27 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# API Keys and Secrets
+*.key
+*.pem
+secrets/
+
+# Database
+database/
+*.db
+*.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+sample-*.txt
+sample-*.pdf
+*.pdf
