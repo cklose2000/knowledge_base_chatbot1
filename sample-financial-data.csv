@@ -1,0 +1,10 @@
+Company,Quarter,Year,Revenue_Millions,Net_Income_Millions,EPS,Gross_Margin_Percent,Operating_Margin_Percent,ROE_Percent,ROA_Percent
+ACME Corp,Q1,2024,2100,380,1.05,40.5,17.2,18.1,9.8
+ACME Corp,Q2,2024,2300,420,1.15,41.2,17.9,19.0,10.1
+ACME Corp,Q3,2024,2500,450,1.25,42.5,18.7,19.4,10.3
+TechCorp,Q1,2024,1800,290,0.95,38.2,16.1,16.8,8.9
+TechCorp,Q2,2024,1950,315,1.02,39.1,16.8,17.2,9.2
+TechCorp,Q3,2024,2100,340,1.10,39.8,17.5,17.8,9.5
+FinanceInc,Q1,2024,3200,580,2.15,45.1,18.1,21.2,11.8
+FinanceInc,Q2,2024,3400,620,2.28,45.8,18.5,21.8,12.1
+FinanceInc,Q3,2024,3600,660,2.42,46.2,18.9,22.3,12.4 

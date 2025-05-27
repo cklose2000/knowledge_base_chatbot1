@@ -340,10 +340,15 @@ ai-analyst-chat/
 - **Benefit**: Superior text extraction quality vs basic PDF parsing
 - **Get Key**: [Unstract LLMWhisperer](https://unstract.com/llmwhisperer/)
 
-### Supabase (Optional)
-- **Purpose**: Production document storage and vector database
-- **Current**: Using in-memory storage for demo
-- **Get Key**: [Supabase](https://supabase.com/)
+### Supabase (Optional but Recommended for Production)
+- **Purpose**: Production document storage and vector database with persistent storage
+- **Benefits**: 
+  - Persistent storage across sessions
+  - Advanced vector similarity search with HNSW indexing
+  - Financial profiles and analytics
+  - Processing logs and search analytics
+- **Setup**: See `SUPABASE_SETUP.md` for detailed instructions
+- **Get Key**: [Supabase](https://supabase.com/) (free tier available)
 
 ## 📊 Performance
 
@@ -356,6 +361,7 @@ ai-analyst-chat/
 - **PDF Files**: Earnings reports, 10-K/10-Q filings, financial statements
 - **Text Quality**: Professional OCR handles scanned documents and complex layouts
 - **Size Limits**: Up to 50MB per document
+- **Storage**: In-memory (demo) or Supabase (production) with persistent vector search
 
 ## 🚀 Deployment
 

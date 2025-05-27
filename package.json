@@ -12,6 +12,7 @@
     "dev:full": "concurrently \"npm run proxy\" \"npm run dev\""
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
     "@types/uuid": "^10.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",

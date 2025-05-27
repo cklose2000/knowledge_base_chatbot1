@@ -1,0 +1,104 @@
+SNOWFLAKE INC.
+THIRD QUARTER 2024 EARNINGS REPORT
+Q3 FY2024 FINANCIAL RESULTS
+
+EXECUTIVE SUMMARY
+Snowflake Inc. delivered exceptional financial performance in Q3 FY2024, with product revenue growth of 32% year-over-year, demonstrating strong customer adoption and expansion of our Data Cloud platform.
+
+FINANCIAL HIGHLIGHTS
+- Total Revenue: $734.2 million (up 32% YoY)
+- Product Revenue: $696.8 million (up 34% YoY)
+- Net Revenue Retention Rate: 135%
+- Remaining Performance Obligations (RPO): $4.7 billion (up 44% YoY)
+- Free Cash Flow: $208.4 million (up 28% YoY)
+- Net Income (Loss): $(194.3) million vs $(214.7) million prior year
+
+INCOME STATEMENT (in millions, except per share data)
+Total Revenue: $734.2
+Product Revenue: $696.8
+Professional Services Revenue: $37.4
+Cost of Revenue: $245.6
+Gross Profit: $488.6
+Gross Margin: 66.5%
+
+Operating Expenses:
+Sales and Marketing: $425.8
+Research and Development: $198.7
+General and Administrative: $58.4
+Total Operating Expenses: $682.9
+
+Operating Loss: $(194.3)
+Interest Income: $45.2
+Other Income: $3.8
+Loss Before Income Taxes: $(145.3)
+Income Tax Provision: $49.0
+Net Loss: $(194.3)
+
+Earnings Per Share (Diluted): $(0.60)
+
+BALANCE SHEET HIGHLIGHTS (in millions)
+Total Assets: $8,942.1
+Cash and Cash Equivalents: $1,284.5
+Short-term Investments: $2,847.3
+Total Current Assets: $4,892.8
+Property and Equipment, net: $1,247.9
+Total Liabilities: $3,156.7
+Current Liabilities: $1,847.2
+Stockholders' Equity: $5,785.4
+
+CASH FLOW STATEMENT (in millions)
+Operating Cash Flow: $248.7
+Investing Cash Flow: $(1,247.8)
+Financing Cash Flow: $89.4
+Free Cash Flow: $208.4
+Capital Expenditures: $40.3
+
+KEY METRICS AND RATIOS
+Gross Margin: 66.5% vs 64.8% prior year
+Operating Margin: (26.5)% vs (38.6)% prior year
+Free Cash Flow Margin: 28.4% vs 26.1% prior year
+Customer Count: 9,437 customers (up 18% YoY)
+Customers with TTM Product Revenue > $1M: 497 (up 35% YoY)
+Net Revenue Retention Rate: 135%
+
+BUSINESS PERFORMANCE
+- Strong customer acquisition with 9,437 total customers
+- 497 customers with trailing twelve months product revenue greater than $1 million
+- Continued expansion in existing customer base with 135% net revenue retention
+- Growing adoption of AI and ML workloads on the platform
+
+SEGMENT PERFORMANCE
+Americas: $521.4M revenue (71% of total)
+EMEA: $142.8M revenue (19% of total)
+Asia Pacific: $70.0M revenue (10% of total)
+
+OUTLOOK AND GUIDANCE
+For Q4 FY2024, Snowflake expects:
+- Product Revenue: $716M - $721M (representing 25% - 26% YoY growth)
+- Total Revenue: $754M - $759M
+- Non-GAAP Operating Margin: approximately (3)%
+
+For Full Year FY2024:
+- Product Revenue: $2.6B - $2.605B (representing 38% YoY growth)
+- Total Revenue: $2.7B - $2.705B
+- Free Cash Flow Margin: approximately 26%
+
+KEY GROWTH DRIVERS
+- Continued strong customer acquisition and expansion
+- Growing adoption of AI and machine learning workloads
+- International expansion, particularly in EMEA and APAC
+- New product innovations including Snowpark and Streamlit
+- Strategic partnerships and marketplace growth
+
+RISKS AND CHALLENGES
+- Macroeconomic headwinds affecting customer spending
+- Intense competition in the cloud data platform market
+- Need for continued investment in R&D and sales capacity
+- Regulatory compliance in international markets
+
+CONFERENCE CALL INFORMATION
+Snowflake will host a conference call today at 2:00 PM PT (5:00 PM ET) to discuss Q3 FY2024 results.
+
+###
+
+Snowflake continues to demonstrate strong execution with robust revenue growth, improving operating leverage, and strong customer metrics. The company remains well-positioned to capitalize on the growing demand for cloud-based data solutions and AI/ML workloads. 

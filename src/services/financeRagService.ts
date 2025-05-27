@@ -1,6 +1,6 @@
-// import { createClient } from '@supabase/supabase-js'; // Currently unused
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
+import { supabaseService } from './supabaseService';
 
 // Types for Finance RAG system
 export interface FinancialDocumentChunk {
@@ -116,18 +116,12 @@ export interface FinanceRAGResponse {
 const globalChunkStorage: FinancialDocumentChunk[] = [];
 
 class FinanceRAGService {
-  // private supabase; // Currently unused in mock implementation
   private openai;
   private embeddingModel: string;
   private chatModel: string;
+  private useSupabase: boolean;
 
   constructor() {
-    // Note: Supabase client currently unused in mock implementation
-    // this.supabase = createClient(
-    //   import.meta.env.VITE_SUPABASE_URL!,
-    //   import.meta.env.VITE_SUPABASE_ANON_KEY!
-    // );
-    
     this.openai = new OpenAI({
       apiKey: import.meta.env.VITE_OPENAI_API_KEY!,
       dangerouslyAllowBrowser: true
@@ -135,6 +129,13 @@ class FinanceRAGService {
     
     this.embeddingModel = import.meta.env.VITE_OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
     this.chatModel = import.meta.env.VITE_OPENAI_CHAT_MODEL || 'gpt-4o-mini';
+    this.useSupabase = supabaseService.isConfigured();
+    
+    if (this.useSupabase) {
+      console.log('🗄️ [FinanceRAG] Using Supabase for persistent storage');
+    } else {
+      console.log('💾 [FinanceRAG] Using in-memory storage (demo mode)');
+    }
   }
 
   /**
@@ -677,32 +678,86 @@ class FinanceRAGService {
   }
 
   private async storeFinancialChunks(chunks: FinancialDocumentChunk[]): Promise<void> {
-    // Store in global memory for demo purposes
-    globalChunkStorage.push(...chunks);
-    console.log(`💾 [FinanceRAG] Stored ${chunks.length} chunks. Total stored: ${globalChunkStorage.length}`);
+    if (this.useSupabase) {
+      // Store in Supabase database
+      await supabaseService.storeChunks(chunks);
+    } else {
+      // Fallback to in-memory storage for demo purposes
+      globalChunkStorage.push(...chunks);
+      console.log(`💾 [FinanceRAG] Stored ${chunks.length} chunks in memory. Total stored: ${globalChunkStorage.length}`);
+    }
     console.log(`📋 [FinanceRAG] Stored chunk types:`, chunks.map(c => c.chunkType));
   }
 
-  private async createFinancialProfile(documentId: string, _structuredData: any): Promise<void> {
-    // This would create a financial profile - implementation depends on your schema
-    console.log('Creating financial profile for document:', documentId);
+  private async createFinancialProfile(documentId: string, structuredData: any): Promise<void> {
+    if (this.useSupabase && structuredData) {
+      try {
+        const profile: FinancialProfile = {
+          id: uuidv4(),
+          documentId: documentId,
+          companyName: structuredData.companyName,
+          ticker: structuredData.ticker,
+          reportType: structuredData.reportType,
+          fiscalPeriod: structuredData.fiscalPeriod,
+          fiscalYear: structuredData.fiscalYear,
+          quarter: structuredData.quarter,
+          currency: structuredData.currency || 'USD',
+          revenue: structuredData.revenue,
+          netIncome: structuredData.netIncome,
+          eps: structuredData.eps,
+          grossMargin: structuredData.grossMargin,
+          operatingMargin: structuredData.operatingMargin,
+          netMargin: structuredData.netMargin,
+          roe: structuredData.roe,
+          roa: structuredData.roa,
+          revenueGrowth: structuredData.revenueGrowth,
+          profileCompletenessScore: 0.8 // Calculate based on available data
+        };
+        
+        await supabaseService.storeProfile(profile);
+      } catch (error) {
+        console.error('Error creating financial profile:', error);
+      }
+    } else {
+      console.log('👤 [FinanceRAG] Creating financial profile for document:', documentId);
+    }
   }
 
   /**
    * Debug method to check stored chunks
    */
-  getStoredChunksDebugInfo(): any {
-    return {
-      totalChunks: globalChunkStorage.length,
-      chunkTypes: globalChunkStorage.map((c: FinancialDocumentChunk) => c.chunkType),
-      companies: [...new Set(globalChunkStorage.map((c: FinancialDocumentChunk) => c.companyName).filter(Boolean))],
-      hasEmbeddings: globalChunkStorage.filter((c: FinancialDocumentChunk) => c.embedding).length,
-      sampleContent: globalChunkStorage.slice(0, 2).map((c: FinancialDocumentChunk) => ({
-        title: c.title,
-        contentPreview: c.content.substring(0, 100) + '...',
-        hasEmbedding: !!c.embedding
-      }))
-    };
+  async getStoredChunksDebugInfo(): Promise<any> {
+    if (this.useSupabase) {
+      try {
+        const stats = await supabaseService.getStats();
+        return {
+          storage: 'supabase',
+          totalChunks: stats.totalChunks,
+          totalProfiles: stats.totalProfiles,
+          totalDocuments: stats.totalDocuments,
+          chunkTypes: Object.keys(stats.chunksByType),
+          chunksByType: stats.chunksByType,
+          companies: stats.companiesProcessed,
+          hasEmbeddings: stats.totalChunks // Assume all chunks have embeddings in Supabase
+        };
+      } catch (error) {
+        console.error('Error getting Supabase stats:', error);
+        return { storage: 'supabase', error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    } else {
+      return {
+        storage: 'memory',
+        totalChunks: globalChunkStorage.length,
+        chunkTypes: globalChunkStorage.map((c: FinancialDocumentChunk) => c.chunkType),
+        companies: [...new Set(globalChunkStorage.map((c: FinancialDocumentChunk) => c.companyName).filter(Boolean))],
+        hasEmbeddings: globalChunkStorage.filter((c: FinancialDocumentChunk) => c.embedding).length,
+        sampleContent: globalChunkStorage.slice(0, 2).map((c: FinancialDocumentChunk) => ({
+          title: c.title,
+          contentPreview: c.content.substring(0, 100) + '...',
+          hasEmbedding: !!c.embedding
+        }))
+      };
+    }
   }
 
   /**
@@ -716,83 +771,109 @@ class FinanceRAGService {
     const startTime = Date.now();
     
     try {
-      console.log(`📚 [FinanceRAG] Searching through ${globalChunkStorage.length} stored chunks`);
-      
-      if (globalChunkStorage.length === 0) {
-        console.log(`⚠️ [FinanceRAG] No chunks stored yet - upload some documents first`);
-        const mockResults: FinancialSearchResult[] = [];
-        const mockProfiles: FinancialProfile[] = [];
-        
-        const processingTime = Date.now() - startTime;
-        return {
-          results: mockResults,
-          financialProfiles: mockProfiles,
-          totalResults: mockResults.length,
-          processingTime,
-          query: query.query,
-          suggestions: await this.generateFinancialSearchSuggestions(query.query),
-        };
-      }
-      
       // Generate query embedding for semantic search
       const queryEmbedding = await this.generateEmbedding(query.query);
       console.log(`🧠 [FinanceRAG] Generated query embedding (${queryEmbedding.length} dimensions)`);
       
-      // Perform semantic search
-      const searchResults: FinancialSearchResult[] = [];
-      const allSimilarities: Array<{title: string, similarity: number}> = [];
+      let searchResults: FinancialSearchResult[] = [];
       
-      for (const chunk of globalChunkStorage) {
-        if (!chunk.embedding) {
-          console.log(`⚠️ [FinanceRAG] Chunk "${chunk.title}" has no embedding`);
-          continue;
+      if (this.useSupabase) {
+        // Use Supabase for search
+        console.log(`🗄️ [FinanceRAG] Searching Supabase database...`);
+        searchResults = await supabaseService.searchChunks(queryEmbedding, {
+          similarityThreshold: query.similarityThreshold || 0.7,
+          maxResults: query.maxResults || 5,
+          companyFilter: query.filters?.companies?.[0],
+          reportTypeFilter: query.filters?.reportTypes?.[0],
+          fiscalYearFilter: query.filters?.fiscalYears?.[0]
+        });
+      } else {
+        // Use in-memory search
+        console.log(`📚 [FinanceRAG] Searching through ${globalChunkStorage.length} stored chunks`);
+        
+        if (globalChunkStorage.length === 0) {
+          console.log(`⚠️ [FinanceRAG] No chunks stored yet - upload some documents first`);
+          const processingTime = Date.now() - startTime;
+          return {
+            results: [],
+            financialProfiles: [],
+            totalResults: 0,
+            processingTime,
+            query: query.query,
+            suggestions: await this.generateFinancialSearchSuggestions(query.query),
+          };
         }
         
-        // Calculate cosine similarity
-        const similarity = this.calculateCosineSimilarity(queryEmbedding, chunk.embedding);
-        allSimilarities.push({ title: chunk.title || 'Untitled', similarity });
+        // Perform in-memory semantic search
+        const allSimilarities: Array<{title: string, similarity: number}> = [];
         
-        console.log(`🔗 [FinanceRAG] "${chunk.title}": similarity = ${similarity.toFixed(3)}`);
-        
-        if (similarity >= (query.similarityThreshold || 0.7)) {
-          searchResults.push({
-            chunkId: chunk.id,
-            documentId: chunk.documentId,
-            similarity: similarity,
-            chunkType: chunk.chunkType,
-            title: chunk.title,
-            content: chunk.content,
-            companyName: chunk.companyName,
-            reportType: chunk.reportType,
-            fiscalPeriod: chunk.fiscalPeriod,
-            metrics: chunk.metrics,
-            metadata: {
-              sectionType: chunk.sectionType,
-              chunkLevel: chunk.chunkLevel,
-              tokenCount: chunk.tokenCount
-            }
-          });
+        for (const chunk of globalChunkStorage) {
+          if (!chunk.embedding) {
+            console.log(`⚠️ [FinanceRAG] Chunk "${chunk.title}" has no embedding`);
+            continue;
+          }
+          
+          // Calculate cosine similarity
+          const similarity = this.calculateCosineSimilarity(queryEmbedding, chunk.embedding);
+          allSimilarities.push({ title: chunk.title || 'Untitled', similarity });
+          
+          console.log(`🔗 [FinanceRAG] "${chunk.title}": similarity = ${similarity.toFixed(3)}`);
+          
+          if (similarity >= (query.similarityThreshold || 0.7)) {
+            searchResults.push({
+              chunkId: chunk.id,
+              documentId: chunk.documentId,
+              similarity: similarity,
+              chunkType: chunk.chunkType,
+              title: chunk.title,
+              content: chunk.content,
+              companyName: chunk.companyName,
+              reportType: chunk.reportType,
+              fiscalPeriod: chunk.fiscalPeriod,
+              metrics: chunk.metrics,
+              metadata: {
+                sectionType: chunk.sectionType,
+                chunkLevel: chunk.chunkLevel,
+                tokenCount: chunk.tokenCount
+              }
+            });
+          }
         }
+        
+        // Sort by similarity (highest first)
+        searchResults.sort((a, b) => b.similarity - a.similarity);
+        
+        // Limit results
+        searchResults = searchResults.slice(0, query.maxResults || 5);
+        
+        console.log(`📊 [FinanceRAG] All similarities:`, allSimilarities.sort((a, b) => b.similarity - a.similarity));
       }
       
-      // Sort by similarity (highest first)
-      searchResults.sort((a, b) => b.similarity - a.similarity);
-      
-      // Limit results
-      const limitedResults = searchResults.slice(0, query.maxResults || 5);
-      
-      console.log(`📊 [FinanceRAG] Found ${limitedResults.length} results for query: "${query.query}"`);
-      console.log(`📊 [FinanceRAG] All similarities:`, allSimilarities.sort((a, b) => b.similarity - a.similarity));
-      limitedResults.forEach((result, index) => {
+      console.log(`📊 [FinanceRAG] Found ${searchResults.length} results for query: "${query.query}"`);
+      searchResults.forEach((result, index) => {
         console.log(`  ${index + 1}. ${result.title} (similarity: ${result.similarity.toFixed(3)})`);
       });
       
       const processingTime = Date.now() - startTime;
       
-             const response = {
-        results: limitedResults,
-        financialProfiles: [], // TODO: Implement financial profiles
-        totalResults: limitedResults.length,
+      // Get financial profiles if using Supabase
+      let financialProfiles: FinancialProfile[] = [];
+      if (this.useSupabase && query.filters?.companies?.[0]) {
+        try {
+          financialProfiles = await supabaseService.getFinancialProfiles({
+            companyFilter: query.filters.companies[0],
+            fiscalYearFilter: query.filters.fiscalYears?.[0],
+            limit: 5
+          });
+        } catch (error) {
+          console.error('Error fetching financial profiles:', error);
+        }
+      }
+      
+      const response = {
+        results: searchResults,
+        financialProfiles: financialProfiles,
+        totalResults: searchResults.length,
         processingTime,
         query: query.query,
         suggestions: await this.generateFinancialSearchSuggestions(query.query),
