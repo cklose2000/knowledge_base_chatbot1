@@ -72,13 +72,25 @@ The schema should automatically enable the vector extension, but if you encounte
    - Check the browser console for Supabase connection logs
    - You should see: "🗄️ [Supabase] Service initialized successfully"
 
-## Step 5: Set Up Row Level Security (Optional)
+## Step 5: Fix Row Level Security for Demo Use
 
-The schema includes basic RLS policies. For production, you may want to customize these:
+The schema includes RLS policies that require authentication. For demo/development use, you need to update these policies:
 
-1. **Review current policies**:
+1. **Run the RLS fix script**:
+   - Go to "SQL Editor" in Supabase
+   - Copy the contents of `database/fix-rls-policies.sql`
+   - Paste and run the script
+   - This will create permissive policies for demo use
+
+2. **Verify policies are updated**:
    ```sql
-   SELECT * FROM pg_policies WHERE tablename IN (
+   SELECT 
+     tablename,
+     policyname,
+     cmd,
+     qual
+   FROM pg_policies 
+   WHERE tablename IN (
      'financial_document_chunks',
      'financial_profiles',
      'document_processing_log',
@@ -86,10 +98,10 @@ The schema includes basic RLS policies. For production, you may want to customiz
    );
    ```
 
-2. **Customize for your needs**:
-   - User-specific access
-   - Organization-based filtering
-   - Role-based permissions
+3. **For production deployment**:
+   - Set up proper Supabase authentication
+   - Create user-specific or organization-based policies
+   - Replace the permissive demo policies with secure ones
 
 ## Step 6: Test the Integration
 
@@ -189,19 +201,31 @@ ORDER BY revenue DESC;
 
 ### Common Issues
 
-1. **"vector extension not found"**:
+1. **"new row violates row-level security policy"** (Most Common):
+   - This happens when RLS policies require authentication but you're using demo mode
+   - **Solution**: Run the `database/fix-rls-policies.sql` script in Supabase SQL Editor
+   - **Verification**: Check that policies show `qual: true` instead of `auth.role() = 'authenticated'`
+   - **Alternative**: Disable RLS temporarily with `ALTER TABLE table_name DISABLE ROW LEVEL SECURITY;`
+
+2. **"vector extension not found"**:
    - Ensure the vector extension is enabled in Supabase
    - Check that your Supabase project supports vector operations
 
-2. **"RLS policy violation"**:
-   - Check your Row Level Security policies
-   - Ensure your application is properly authenticated
+3. **"401 Unauthorized" errors**:
+   - Verify your `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are correct
+   - Check that the anon key has the right permissions
+   - Ensure RLS policies allow the operations you're trying to perform
 
-3. **"Function search_financial_chunks does not exist"**:
+4. **"Function search_financial_chunks does not exist"**:
    - Re-run the schema script
    - Check that all functions were created successfully
 
-4. **Slow search performance**:
+5. **"violates foreign key constraint parent_chunk_id_fkey"**:
+   - This happens when child chunks reference parent chunks that haven't been inserted yet
+   - **Solution**: The application now handles this by inserting chunks level by level
+   - **Verification**: Check that chunks are being stored in batches by level (Level 1, then Level 2, etc.)
+
+6. **Slow search performance**:
    - Verify vector indexes are created
    - Check query execution plans
    - Consider adjusting HNSW index parameters

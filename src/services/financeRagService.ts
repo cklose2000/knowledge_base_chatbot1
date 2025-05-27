@@ -466,7 +466,7 @@ class FinanceRAGService {
       const incomeChunk: FinancialDocumentChunk = {
         id: uuidv4(),
         documentId,
-        parentChunkId: summaryChunk.id,
+        // parentChunkId: summaryChunk.id, // Temporarily removed to fix foreign key constraint
         chunkLevel: 2,
         chunkOrder: chunkOrder++,
         chunkType: 'income_statement',
@@ -487,7 +487,7 @@ class FinanceRAGService {
       const balanceChunk: FinancialDocumentChunk = {
         id: uuidv4(),
         documentId,
-        parentChunkId: summaryChunk.id,
+        // parentChunkId: summaryChunk.id, // Temporarily removed to fix foreign key constraint
         chunkLevel: 2,
         chunkOrder: chunkOrder++,
         chunkType: 'balance_sheet',
@@ -508,7 +508,7 @@ class FinanceRAGService {
       const cashFlowChunk: FinancialDocumentChunk = {
         id: uuidv4(),
         documentId,
-        parentChunkId: summaryChunk.id,
+        // parentChunkId: summaryChunk.id, // Temporarily removed to fix foreign key constraint
         chunkLevel: 2,
         chunkOrder: chunkOrder++,
         chunkType: 'cash_flow',
@@ -530,7 +530,7 @@ class FinanceRAGService {
       const metricsChunk: FinancialDocumentChunk = {
         id: uuidv4(),
         documentId,
-        parentChunkId: summaryChunk.id,
+        // parentChunkId: summaryChunk.id, // Temporarily removed to fix foreign key constraint
         chunkLevel: 2,
         chunkOrder: chunkOrder++,
         chunkType: 'key_metrics',
@@ -553,7 +553,7 @@ class FinanceRAGService {
         const highlightChunk: FinancialDocumentChunk = {
           id: uuidv4(),
           documentId,
-          parentChunkId: summaryChunk.id,
+          // parentChunkId: summaryChunk.id, // Temporarily removed to fix foreign key constraint
           chunkLevel: 3,
           chunkOrder: chunkOrder++,
           chunkType: 'highlight',
@@ -679,7 +679,8 @@ class FinanceRAGService {
 
   private async storeFinancialChunks(chunks: FinancialDocumentChunk[]): Promise<void> {
     if (this.useSupabase) {
-      // Store in Supabase database
+      // Store in Supabase database (parent-child relationships temporarily disabled)
+      console.log(`💾 [FinanceRAG] Storing ${chunks.length} chunks in Supabase...`);
       await supabaseService.storeChunks(chunks);
     } else {
       // Fallback to in-memory storage for demo purposes

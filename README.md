@@ -78,8 +78,9 @@ A professional ChatGPT-style chat interface designed for investment banking and 
 ### Prerequisites
 - Node.js 18+ 
 - npm or yarn
-- OpenAI API Key
+- OpenAI API Key (required)
 - LLMWhisperer API Key (optional, for enhanced PDF processing)
+- Supabase Account (optional, for production document storage)
 
 ### Environment Setup
 
@@ -293,6 +294,12 @@ ai-analyst-chat/
 ## 🔧 Development Notes
 
 ### Recent Major Updates (Latest)
+- ✅ **Supabase Production Integration** - Enterprise-ready document storage
+  - Complete database schema with vector similarity search
+  - HNSW indexing for fast approximate search
+  - Financial profiles and analytics storage
+  - Row Level Security (RLS) policies for demo and production
+  - Hybrid storage system (Supabase + in-memory fallback)
 - ✅ **LLMWhisperer v2 Integration** - Professional OCR for financial documents
   - Fixed API parameter issues (`pages_to_extract` handling)
   - Implemented asynchronous processing workflow
@@ -347,8 +354,10 @@ ai-analyst-chat/
   - Advanced vector similarity search with HNSW indexing
   - Financial profiles and analytics
   - Processing logs and search analytics
-- **Setup**: See `SUPABASE_SETUP.md` for detailed instructions
+  - Automatic fallback to in-memory storage if not configured
+- **Setup**: See `SUPABASE_SETUP.md` for detailed step-by-step instructions
 - **Get Key**: [Supabase](https://supabase.com/) (free tier available)
+- **Status**: ✅ **Production Ready** - Complete integration with RLS policies and error handling
 
 ## 📊 Performance
 
@@ -361,7 +370,10 @@ ai-analyst-chat/
 - **PDF Files**: Earnings reports, 10-K/10-Q filings, financial statements
 - **Text Quality**: Professional OCR handles scanned documents and complex layouts
 - **Size Limits**: Up to 50MB per document
-- **Storage**: In-memory (demo) or Supabase (production) with persistent vector search
+- **Storage Options**: 
+  - **Demo Mode**: In-memory storage (no setup required)
+  - **Production Mode**: Supabase with persistent vector search and analytics
+  - **Hybrid**: Automatic fallback between modes
 
 ## 🚀 Deployment
 

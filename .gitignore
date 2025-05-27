@@ -35,10 +35,11 @@ dist-ssr
 *.pem
 secrets/
 
-# Database
-database/
+# Database files (but keep schema)
 *.db
 *.sqlite
+database/data/
+database/backups/
 
 # Temporary files
 *.tmp
