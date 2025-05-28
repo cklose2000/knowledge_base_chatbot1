@@ -116,7 +116,12 @@ class FileUploadService {
       this.updateProgress(fileId, 60, 'processing', options.onProgress);
       const documentId = uuidv4();
       console.log(`🔄 [FileUpload] Processing document with ID: ${documentId}`);
-      const chunks = await financeRagService.processFinancialDocument(
+      
+      console.log(`📤 uploadFile -> calling processDocument on`,
+                  financeRagService,
+                  financeRagService.processDocument.toString().slice(0,80));
+      
+      const chunks = await financeRagService.processDocument(
         documentId,
         extractedText,
         {
@@ -200,12 +205,15 @@ class FileUploadService {
       // Handle PDF files using our PDF service (with LLMWhisperer fallback)
       if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
         try {
-          // Try our PDF.js service first
-          return await pdfService.extractTextFromPDF(content, file.name);
-        } catch (error) {
-          console.log('📄 [FileUpload] PDF.js failed, trying LLMWhisperer fallback...');
-          // Fallback to LLMWhisperer if available
-          return await llmWhispererService.extractTextFromPDF(content, file.name);
+          // Try our PDF.js service first. Pass a clone to ensure it doesn't affect other uses.
+          console.log('📄 [FileUpload] Attempting PDF extraction with PDF.js service...');
+          return await pdfService.extractTextFromPDF(content.slice(0), file.name);
+        } catch (pdfJsError) {
+          console.warn('🟡 [FileUpload] PDF.js service failed:', pdfJsError);
+          console.log('🔄 [FileUpload] PDF.js failed, trying LLMWhisperer fallback...');
+          // Fallback to LLMWhisperer if available.
+          // Ensure LLMWhisperer gets a fresh clone of the original 'content' buffer.
+          return await llmWhispererService.extractTextFromPDF(content.slice(0), file.name);
         }
       }
       

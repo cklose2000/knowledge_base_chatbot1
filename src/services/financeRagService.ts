@@ -1,6 +1,14 @@
+const MODULE_UUID = crypto.randomUUID();
+console.log(`🧩 financeRagService module loaded: ${MODULE_UUID}`);
+
+(globalThis as any).__FIN_RAG_UUIDS__ ??= [];
+(globalThis as any).__FIN_RAG_UUIDS__.push(MODULE_UUID);
+
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { supabaseService } from './supabaseService';
+import { modernRagService } from './modernRagService';
+import type { ModernFinancialChunk, ModernSearchResult } from './modernRagService';
 
 // Types for Finance RAG system
 export interface FinancialDocumentChunk {
@@ -80,6 +88,8 @@ export interface FinancialSearchResult {
   fiscalPeriod?: string;
   metrics?: string[];
   metadata: Record<string, any>;
+  parent_id?: string;
+  parent_content?: string;
 }
 
 export interface FinanceRAGQuery {
@@ -92,6 +102,7 @@ export interface FinanceRAGQuery {
     quarters?: number[];
     metrics?: string[];
     sectors?: string[];
+    documentId?: string;
   };
   maxResults?: number;
   similarityThreshold?: number;
@@ -115,13 +126,31 @@ export interface FinanceRAGResponse {
 // Global storage for demo purposes (in production this would be a database)
 const globalChunkStorage: FinancialDocumentChunk[] = [];
 
+// Helper function to rewrite short queries for better embedding context
+function rewriteQueryForEmbedding(query: string): string {
+  if (query.length < 20 && query.length > 0) { // Adjusted length threshold slightly
+    // Check if it's likely a question
+    const questionKeywords = ['what', 'who', 'when', 'where', 'why', 'how', 'is', 'are', 'do', 'does', 'can', 'could', 'summarize'];
+    const isQuestion = questionKeywords.some(keyword => query.toLowerCase().startsWith(keyword)) || query.endsWith('?');
+    
+    if (isQuestion) {
+      return `Regarding the uploaded financial documents (like earnings call transcripts or 10-K filings), answer this question: ${query}`;
+    } else {
+      return `Regarding the uploaded financial documents (like earnings call transcripts or 10-K filings), provide information about: ${query}`;
+    }
+  }
+  return query;
+}
+
 class FinanceRAGService {
   private openai;
   private embeddingModel: string;
   private chatModel: string;
   private useSupabase: boolean;
+  private useModernRAG: boolean;
 
   constructor() {
+    console.log(`📦 new FinanceRagService() @`, new Error().stack?.split('\n')[2]);
     this.openai = new OpenAI({
       apiKey: import.meta.env.VITE_OPENAI_API_KEY!,
       dangerouslyAllowBrowser: true
@@ -130,12 +159,262 @@ class FinanceRAGService {
     this.embeddingModel = import.meta.env.VITE_OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
     this.chatModel = import.meta.env.VITE_OPENAI_CHAT_MODEL || 'gpt-4o-mini';
     this.useSupabase = supabaseService.isConfigured();
+    this.useModernRAG = true; // Re-enable Modern RAG
+    // this.useModernRAG = false; // TEMPORARILY force Legacy RAG for testing
     
     if (this.useSupabase) {
       console.log('🗄️ [FinanceRAG] Using Supabase for persistent storage');
     } else {
       console.log('💾 [FinanceRAG] Using in-memory storage (demo mode)');
     }
+
+    if (this.useModernRAG) {
+      console.log('🚀 [FinanceRAG] Using Modern RAG with hierarchical chunking');
+    }
+  }
+
+  /**
+   * Process financial document using modern RAG service
+   */
+  async processDocument(
+    documentId: string,
+    content: string,
+    metadata: Record<string, any> = {}
+  ): Promise<FinancialDocumentChunk[]> {
+    console.log("🔴🔴🔴 TOP OF processDocument REACHED 🔴🔴🔴", documentId, "ModernRAG:", this.useModernRAG);
+
+    // Store the full document content first
+    if (this.useSupabase) {
+      console.log(`[DEBUG FinanceRAG] this.useSupabase is true. Attempting to store full document.`);
+      try {
+        await supabaseService.storeProcessedDocument({
+          id: documentId,
+          document_title: metadata.filename || `Document ${documentId.substring(0,8)}`,
+          company_name: metadata.companyName, // Assuming metadata might have this
+          report_type: metadata.reportType,   // Assuming metadata might have this
+          full_text_content: content,
+          token_count: this.estimateTokens(content) 
+        });
+        console.log(`[DEBUG FinanceRAG] Successfully called storeProcessedDocument for documentId: ${documentId}`);
+      } catch (error) {
+        console.error('[DEBUG FinanceRAG] Error calling storeProcessedDocument:', error);
+      }
+    } else {
+      console.log(`[DEBUG FinanceRAG] this.useSupabase is false. Skipping storeProcessedDocument.`);
+    }
+    
+    // Forcing Modern RAG path for this test
+    console.log(`[DEBUG FinanceRAG] FORCING call to processWithModernRAG for documentId: ${documentId}`);
+    return this.processWithModernRAG(documentId, content, metadata);
+
+    // Original routing logic commented out for this test:
+    // if (this.useModernRAG) {
+    //   console.log(`[DEBUG FinanceRAG] Routing to processWithModernRAG for documentId: ${documentId}`);
+    //   return this.processWithModernRAG(documentId, content, metadata);
+    // } else {
+    //   console.log(`[DEBUG FinanceRAG] Routing to processFinancialDocument (legacy path) for documentId: ${documentId}`);
+    //   return this.processFinancialDocument(documentId, content, metadata);
+    // }
+  }
+
+  /**
+   * Process document using modern RAG service
+   */
+  private async processWithModernRAG(
+    documentId: string,
+    content: string,
+    metadata: Record<string, any>
+  ): Promise<FinancialDocumentChunk[]> {
+    console.log(`🚀 [FinanceRAG] Processing with Modern RAG...`);
+    
+    try {
+      // Use modern RAG service for processing
+      const modernChunks = await modernRagService.processDocument(content, documentId, {
+        companyName: metadata.companyName,
+        reportType: metadata.reportType,
+        filename: metadata.filename
+      });
+
+      // Convert modern chunks to legacy format for backward compatibility
+      const legacyChunks = this.convertModernToLegacyChunks(modernChunks);
+
+      // Store in Supabase using existing storage method
+      if (this.useSupabase) {
+        await this.storeFinancialChunks(legacyChunks);
+      } else {
+        globalChunkStorage.push(...legacyChunks);
+      }
+
+      // Create financial profile from structured data
+      await this.createFinancialProfileFromContent(documentId, content, metadata);
+
+      console.log(`✅ [FinanceRAG] Modern RAG processing complete: ${legacyChunks.length} chunks created`);
+      return legacyChunks;
+    } catch (error) {
+      console.error('🚨 [FinanceRAG] Modern RAG processing failed:', error);
+      // Fallback to legacy processing
+      console.log('🔄 [FinanceRAG] Falling back to legacy processing...');
+      return this.processFinancialDocument(documentId, content, metadata);
+    }
+  }
+
+  /**
+   * Convert modern chunks to legacy format
+   */
+  private convertModernToLegacyChunks(modernChunks: ModernFinancialChunk[]): FinancialDocumentChunk[] {
+    return modernChunks.map((modernChunk, index) => ({
+      id: modernChunk.id,
+      documentId: modernChunk.metadata.documentId,
+      parentChunkId: modernChunk.parentId,
+      chunkLevel: modernChunk.level === 'parent' ? 1 : 2,
+      chunkOrder: modernChunk.metadata.position,
+      chunkType: modernChunk.metadata.chunkType,
+      title: modernChunk.metadata.section || `Chunk ${index + 1}`,
+      content: modernChunk.content,
+      tokenCount: this.estimateTokens(modernChunk.content),
+      sectionType: modernChunk.metadata.chunkType,
+      companyName: modernChunk.metadata.companyName,
+      reportType: modernChunk.metadata.reportType,
+      embedding: modernChunk.embedding
+    }));
+  }
+
+  /**
+   * Enhanced search using modern RAG service
+   */
+  async searchFinancialDocuments(query: FinanceRAGQuery): Promise<FinanceRAGResponse> {
+    const startTime = Date.now();
+    console.log(`🔍 [FinanceRAG] Received search query: "${query.query}"`, query.filters);
+
+    if (this.useModernRAG) {
+      try {
+        console.log('🚀 [FinanceRAG] Attempting search with Modern RAG...');
+        const modernSearchResults = await modernRagService.search(query.query, {
+          maxResults: query.maxResults,
+          similarityThreshold: query.similarityThreshold !== undefined ? Math.min(query.similarityThreshold, 0.05) : 0.05,
+          documentId: query.filters?.documentId
+        });
+        
+        const legacyResults = this.convertModernToLegacyResults(modernSearchResults);
+        
+        const processingTime = Date.now() - startTime;
+        console.log(`⏱️ [FinanceRAG] Modern RAG search completed in ${processingTime}ms, found ${legacyResults.length} results.`);
+        
+        // Placeholder for financial profiles and suggestions for modern path
+        return {
+          results: legacyResults,
+          financialProfiles: [], 
+          totalResults: legacyResults.length,
+          processingTime,
+          query: query.query,
+          suggestions: [],
+        };
+      } catch (modernRagError) {
+        console.warn('⚠️ [FinanceRAG] Modern RAG search failed, falling back to legacy RAG:', modernRagError);
+        // Fall through to legacy RAG
+      }
+    }
+    
+    console.log(' legacy RAG search starting ');
+    return this.searchWithLegacyRAG(query, startTime);
+  }
+
+  private async searchWithModernRAG(query: FinanceRAGQuery, startTime: number): Promise<FinanceRAGResponse> {
+    try {
+      console.log(`🚀 [FinanceRAG] Using Modern RAG enhanced search...`);
+      
+      // Use modern RAG enhanced search
+      const modernResults = await modernRagService.enhancedSearch(query.query);
+      
+      // Convert modern results to legacy format
+      const legacyResults = this.convertModernToLegacyResults(modernResults);
+      
+      // Get financial profiles
+      const profiles = await this.getFinancialProfiles();
+      
+      const processingTime = Date.now() - startTime;
+      
+      console.log(`✅ [FinanceRAG] Modern search complete: ${legacyResults.length} results in ${processingTime}ms`);
+      
+      return {
+        results: legacyResults,
+        financialProfiles: profiles,
+        totalResults: legacyResults.length,
+        processingTime,
+        query: query.query,
+        suggestions: await this.generateFinancialSearchSuggestions(query.query)
+      };
+    } catch (error) {
+      console.error('🚨 [FinanceRAG] Modern search failed:', error);
+      // Fallback to legacy search
+      console.log('🔄 [FinanceRAG] Falling back to legacy search...');
+      return this.searchWithLegacyRAG(query, startTime);
+    }
+  }
+
+  /**
+   * Convert modern search results to legacy format
+   */
+  private convertModernToLegacyResults(modernResults: ModernSearchResult[]): FinancialSearchResult[] {
+    if (!modernResults) return [];
+    return modernResults.map(mr => ({
+      chunkId: mr.chunk.id,
+      documentId: mr.chunk.metadata.documentId,
+      similarity: mr.similarity,
+      chunkType: mr.chunk.metadata.chunkType as string,
+      title: mr.chunk.metadata.section,
+      content: mr.chunk.content,
+      companyName: mr.chunk.metadata.companyName,
+      reportType: mr.chunk.metadata.reportType,
+      fiscalPeriod: undefined,
+      metrics: undefined,
+      metadata: { 
+        ...mr.chunk.metadata, 
+      },
+      parent_id: mr.chunk.parentId,
+      parent_content: mr.context?.content
+    }));
+  }
+
+  /**
+   * Create financial profile from content analysis
+   */
+  private async createFinancialProfileFromContent(
+    documentId: string,
+    content: string,
+    metadata: Record<string, any>
+  ): Promise<void> {
+    try {
+      // Extract basic financial data using LLM
+      const structuredData = await this.extractFinancialData(content);
+      
+      // Create profile using existing method
+      await this.createFinancialProfile(documentId, structuredData);
+    } catch (error) {
+      console.error('🚨 [FinanceRAG] Failed to create financial profile:', error);
+      // Create basic profile with available metadata
+      const basicProfile: FinancialProfile = {
+        id: uuidv4(),
+        documentId,
+        companyName: metadata.companyName,
+        reportType: metadata.reportType,
+        profileCompletenessScore: 0.3 // Low score for basic profile
+      };
+      
+      if (this.useSupabase) {
+        await supabaseService.storeProfile(basicProfile);
+      }
+    }
+  }
+
+  /**
+   * Get financial profiles
+   */
+  private async getFinancialProfiles(): Promise<FinancialProfile[]> {
+    if (this.useSupabase) {
+      return await supabaseService.getFinancialProfiles();
+    }
+    return [];
   }
 
   /**
@@ -163,6 +442,7 @@ class FinanceRAGService {
     content: string,
     _metadata: Record<string, any> = {}
   ): Promise<FinancialDocumentChunk[]> {
+    console.error('❌ legacy processFinancialDocument hit! Path to this method should be removed or conditional logic reviewed. Call stack:', new Error().stack);
     console.log(`🏦 [FinanceRAG] Processing document ${documentId} with ${content.length} characters`);
     
     try {
@@ -696,23 +976,40 @@ class FinanceRAGService {
         const profile: FinancialProfile = {
           id: uuidv4(),
           documentId: documentId,
-          companyName: structuredData.companyName,
-          ticker: structuredData.ticker,
-          reportType: structuredData.reportType,
-          fiscalPeriod: structuredData.fiscalPeriod,
-          fiscalYear: structuredData.fiscalYear,
-          quarter: structuredData.quarter,
-          currency: structuredData.currency || 'USD',
-          revenue: structuredData.revenue,
-          netIncome: structuredData.netIncome,
-          eps: structuredData.eps,
-          grossMargin: structuredData.grossMargin,
-          operatingMargin: structuredData.operatingMargin,
-          netMargin: structuredData.netMargin,
-          roe: structuredData.roe,
-          roa: structuredData.roa,
-          revenueGrowth: structuredData.revenueGrowth,
-          profileCompletenessScore: 0.8 // Calculate based on available data
+          companyName: structuredData.companyInfo?.companyName,
+          ticker: structuredData.companyInfo?.ticker,
+          sector: structuredData.companyInfo?.sector,
+          industry: structuredData.companyInfo?.industry,
+          marketCap: structuredData.companyInfo?.marketCap,
+          reportType: structuredData.reportInfo?.reportType,
+          fiscalPeriod: structuredData.reportInfo?.fiscalPeriod,
+          fiscalYear: structuredData.reportInfo?.fiscalYear,
+          quarter: structuredData.reportInfo?.quarter,
+          reportingDate: structuredData.reportInfo?.reportingDate,
+          currency: structuredData.companyInfo?.currency || 'USD',
+          
+          revenue: structuredData.financialMetrics?.revenue,
+          netIncome: structuredData.financialMetrics?.netIncome,
+          eps: structuredData.financialMetrics?.eps,
+          grossMargin: structuredData.financialMetrics?.grossMargin,
+          operatingMargin: structuredData.financialMetrics?.operatingMargin,
+          netMargin: structuredData.financialMetrics?.netMargin,
+          roe: structuredData.financialMetrics?.roe,
+          roa: structuredData.financialMetrics?.roa,
+          debtToEquity: structuredData.financialMetrics?.debtToEquity,
+          currentRatio: structuredData.financialMetrics?.currentRatio,
+
+          revenueGrowth: structuredData.growthMetrics?.revenueGrowth,
+          netIncomeGrowth: structuredData.growthMetrics?.netIncomeGrowth,
+          epsGrowth: structuredData.growthMetrics?.epsGrowth,
+
+          totalAssets: structuredData.financialMetrics?.totalAssets, // Or balanceSheet?.totalAssets
+          totalLiabilities: structuredData.financialMetrics?.totalLiabilities, // Or balanceSheet?.totalLiabilities
+          shareholdersEquity: structuredData.financialMetrics?.shareholdersEquity, // Or balanceSheet?.shareholdersEquity
+          operatingCashFlow: structuredData.financialMetrics?.operatingCashFlow, // Or cashFlowStatement?.operatingCashFlow
+          freeCashFlow: structuredData.financialMetrics?.freeCashFlow, // Or cashFlowStatement?.freeCashFlow
+
+          profileCompletenessScore: 0.8 // TODO: Calculate based on available data
         };
         
         await supabaseService.storeProfile(profile);
@@ -761,136 +1058,132 @@ class FinanceRAGService {
     }
   }
 
-  /**
-   * Search financial documents
-   */
-  async searchFinancialDocuments(query: FinanceRAGQuery): Promise<FinanceRAGResponse> {
-    console.log(`🔍 [FinanceRAG] Searching for: "${query.query}"`);
-    console.log(`🔍 [FinanceRAG] Filters:`, query.filters);
-    console.log(`🔍 [FinanceRAG] Debug info:`, this.getStoredChunksDebugInfo());
+  private async generateFinancialSearchSuggestions(query: string): Promise<string[]> {
+    const suggestions = [
+      'revenue growth trends',
+      'profit margin analysis',
+      'cash flow performance',
+      'debt-to-equity ratios',
+      'earnings per share',
+      'return on equity',
+      'quarterly comparisons',
+      'year-over-year growth',
+    ];
     
-    const startTime = Date.now();
-    
-    try {
-      // Generate query embedding for semantic search
-      const queryEmbedding = await this.generateEmbedding(query.query);
-      console.log(`🧠 [FinanceRAG] Generated query embedding (${queryEmbedding.length} dimensions)`);
-      
-      let searchResults: FinancialSearchResult[] = [];
-      
-      if (this.useSupabase) {
-        // Use Supabase for search
-        console.log(`🗄️ [FinanceRAG] Searching Supabase database...`);
-        searchResults = await supabaseService.searchChunks(queryEmbedding, {
-          similarityThreshold: query.similarityThreshold || 0.7,
-          maxResults: query.maxResults || 5,
-          companyFilter: query.filters?.companies?.[0],
-          reportTypeFilter: query.filters?.reportTypes?.[0],
-          fiscalYearFilter: query.filters?.fiscalYears?.[0]
-        });
-      } else {
-        // Use in-memory search
-        console.log(`📚 [FinanceRAG] Searching through ${globalChunkStorage.length} stored chunks`);
-        
-        if (globalChunkStorage.length === 0) {
-          console.log(`⚠️ [FinanceRAG] No chunks stored yet - upload some documents first`);
-          const processingTime = Date.now() - startTime;
-          return {
-            results: [],
-            financialProfiles: [],
-            totalResults: 0,
-            processingTime,
-            query: query.query,
-            suggestions: await this.generateFinancialSearchSuggestions(query.query),
-          };
-        }
-        
-        // Perform in-memory semantic search
-        const allSimilarities: Array<{title: string, similarity: number}> = [];
-        
-        for (const chunk of globalChunkStorage) {
-          if (!chunk.embedding) {
-            console.log(`⚠️ [FinanceRAG] Chunk "${chunk.title}" has no embedding`);
-            continue;
-          }
-          
-          // Calculate cosine similarity
-          const similarity = this.calculateCosineSimilarity(queryEmbedding, chunk.embedding);
-          allSimilarities.push({ title: chunk.title || 'Untitled', similarity });
-          
-          console.log(`🔗 [FinanceRAG] "${chunk.title}": similarity = ${similarity.toFixed(3)}`);
-          
-          if (similarity >= (query.similarityThreshold || 0.7)) {
-            searchResults.push({
-              chunkId: chunk.id,
-              documentId: chunk.documentId,
-              similarity: similarity,
-              chunkType: chunk.chunkType,
-              title: chunk.title,
-              content: chunk.content,
-              companyName: chunk.companyName,
-              reportType: chunk.reportType,
-              fiscalPeriod: chunk.fiscalPeriod,
-              metrics: chunk.metrics,
-              metadata: {
-                sectionType: chunk.sectionType,
-                chunkLevel: chunk.chunkLevel,
-                tokenCount: chunk.tokenCount
-              }
-            });
-          }
-        }
-        
-        // Sort by similarity (highest first)
-        searchResults.sort((a, b) => b.similarity - a.similarity);
-        
-        // Limit results
-        searchResults = searchResults.slice(0, query.maxResults || 5);
-        
-        console.log(`📊 [FinanceRAG] All similarities:`, allSimilarities.sort((a, b) => b.similarity - a.similarity));
-      }
-      
-      console.log(`📊 [FinanceRAG] Found ${searchResults.length} results for query: "${query.query}"`);
-      searchResults.forEach((result, index) => {
-        console.log(`  ${index + 1}. ${result.title} (similarity: ${result.similarity.toFixed(3)})`);
-      });
-      
-      const processingTime = Date.now() - startTime;
-      
-      // Get financial profiles if using Supabase
-      let financialProfiles: FinancialProfile[] = [];
-      if (this.useSupabase && query.filters?.companies?.[0]) {
-        try {
-          financialProfiles = await supabaseService.getFinancialProfiles({
-            companyFilter: query.filters.companies[0],
-            fiscalYearFilter: query.filters.fiscalYears?.[0],
-            limit: 5
-          });
-        } catch (error) {
-          console.error('Error fetching financial profiles:', error);
-        }
-      }
-      
-      const response = {
-        results: searchResults,
-        financialProfiles: financialProfiles,
-        totalResults: searchResults.length,
-        processingTime,
-        query: query.query,
-        suggestions: await this.generateFinancialSearchSuggestions(query.query),
-      };
-      
-      console.log(`⏱️ [FinanceRAG] Search completed in ${processingTime}ms`);
-      return response;
-    } catch (error) {
-      console.error('🚨 [FinanceRAG] Error performing financial search:', error);
-      throw new Error('Financial search failed');
-    }
+    return suggestions.filter(s => 
+      s.toLowerCase().includes(query.toLowerCase().split(' ')[0])
+    ).slice(0, 3);
   }
 
   /**
-   * Calculate cosine similarity between two vectors
+   * Legacy search implementation (fallback)
    */
+  private async searchWithLegacyRAG(query: FinanceRAGQuery, startTime: number): Promise<FinanceRAGResponse> {
+    console.log(`🔍 [FinanceRAG] Performing legacy search for: "${query.query}"`);
+    
+    const initialRpcThreshold = 0.01; // For fetching top K from DB
+
+    const finalResults = await this._performAdvancedVectorSearch(
+      query.query,
+      query.filters,
+      query.maxResults ? query.maxResults * 2 : 20, 
+      query.maxResults || 10,
+      initialRpcThreshold
+    );
+
+    // Optional: Apply a final hard threshold if the user specified one in the query,
+    // and if it's stricter than what the adaptive filter might have allowed.
+    let hardFilteredResults = finalResults; 
+    // if (query.similarityThreshold && query.similarityThreshold > 0) { // <-- COMMENTED OUT
+    //   const userThreshold = query.similarityThreshold;
+    //   hardFilteredResults = finalResults.filter(r => r.similarity >= userThreshold);
+    //   if (hardFilteredResults.length < finalResults.length) {
+    //     console.log(`🔪 [FinanceRAG] Applied final hard threshold of ${userThreshold}, reduced results from ${finalResults.length} to ${hardFilteredResults.length}`);
+    //   }
+    // }
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`⏱️ [FinanceRAG] Legacy search completed in ${processingTime}ms, found ${hardFilteredResults.length} results.`);
+
+    const financialProfiles: FinancialProfile[] = [];
+    if (hardFilteredResults.length > 0 && this.useSupabase) {
+      const companyNames = [...new Set(hardFilteredResults.map(r => r.companyName).filter(Boolean) as string[])];
+      if (companyNames.length > 0) {
+        console.log(`ℹ️ [FinanceRAG] Profile fetching for companies: ${companyNames.join(', ')} (currently placeholder)`);
+      }
+    } else if (hardFilteredResults.length > 0 && !this.useSupabase) {
+        console.log('ℹ️ [FinanceRAG] In-memory profile retrieval (placeholder)');
+    }
+    
+    const suggestions = await this.generateFinancialSearchSuggestions(query.query);
+
+    return {
+      results: hardFilteredResults, 
+      financialProfiles,
+      totalResults: hardFilteredResults.length,
+      processingTime,
+      query: query.query,
+      suggestions,
+    };
+  }
+
+  // New method for advanced vector search with adaptive filtering
+  private async _performAdvancedVectorSearch(
+    originalQuery: string,
+    filters?: FinanceRAGQuery['filters'],
+    maxResultsInitial: number = 20,
+    maxResultsFinal: number = 10,
+    // Use a very low threshold for initial DB fetch to get top K
+    // The user's threshold from query.similarityThreshold can be used as a final hard cut if needed,
+    // or to adjust the adaptive filter's strictness.
+    // For now, this initial threshold is for the DB call.
+    similarityThresholdInitialRpc: number = 0.01 
+  ): Promise<FinancialSearchResult[]> {
+    
+    const rewrittenQuery = rewriteQueryForEmbedding(originalQuery);
+    if (originalQuery !== rewrittenQuery) {
+      console.log(`🔄 [FinanceRAG] Query rewritten for embedding: "${rewrittenQuery}"`);
+    }
+
+    const queryEmbedding = await this.generateEmbedding(rewrittenQuery);
+
+    let searchResults = await supabaseService.searchChunks(queryEmbedding, {
+      similarityThreshold: similarityThresholdInitialRpc, // Pass the low threshold for DB RPC
+      maxResults: maxResultsInitial,
+      companyFilter: filters?.companies?.[0], 
+      reportTypeFilter: filters?.reportTypes?.[0],
+      fiscalYearFilter: filters?.fiscalYears?.[0],
+    });
+
+    searchResults.sort((a, b) => b.similarity - a.similarity);
+
+    if (!searchResults || searchResults.length === 0) {
+      return [];
+    }
+
+    const bestSimilarity = searchResults[0].similarity;
+    // Adaptive filter: s_current >= 1.5 * s_best - 0.5
+    // Clamped at 0 to prevent negative thresholds for very low bestSimilarity.
+    let minAcceptedSimilarityAdaptive = Math.max(0, (1.5 * bestSimilarity) - 0.5);
+    
+    console.log(`📊 [FinanceRAG] Adaptive filtering: Best similarity=${bestSimilarity.toFixed(4)}, Calculated adaptive min_sim=${minAcceptedSimilarityAdaptive.toFixed(4)}`);
+
+    // Optional: If user provided a threshold in the original query, ensure we don't go below that.
+    // const userOriginalThreshold = filters?. // This was not part of FinanceRAGQuery structure for searchWithLegacyRAG call before
+    // Let's assume query.similarityThreshold is the user's desired *final* minimum if provided
+    // This field is on FinanceRAGQuery, not filters.
+    // For now, the _performAdvancedVectorSearch doesn't directly see query.similarityThreshold.
+    // searchWithLegacyRAG should decide how to use it.
+
+    const adaptivelyFilteredResults = searchResults.filter(
+      (result) => result.similarity >= minAcceptedSimilarityAdaptive
+    );
+    
+    console.log(`🔎 [FinanceRAG] Results after adaptive filter: ${adaptivelyFilteredResults.length}`);
+
+    return adaptivelyFilteredResults.slice(0, maxResultsFinal);
+  }
+
   private calculateCosineSimilarity(vectorA: number[], vectorB: number[]): number {
     if (vectorA.length !== vectorB.length) {
       throw new Error('Vectors must have the same length');
@@ -912,23 +1205,27 @@ class FinanceRAGService {
     
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
-
-  private async generateFinancialSearchSuggestions(query: string): Promise<string[]> {
-    const suggestions = [
-      'revenue growth trends',
-      'profit margin analysis',
-      'cash flow performance',
-      'debt-to-equity ratios',
-      'earnings per share',
-      'return on equity',
-      'quarterly comparisons',
-      'year-over-year growth',
-    ];
-    
-    return suggestions.filter(s => 
-      s.toLowerCase().includes(query.toLowerCase().split(' ')[0])
-    ).slice(0, 3);
-  }
 }
 
-export const financeRagService = new FinanceRAGService(); 
+export const financeRagService = new FinanceRAGService();
+
+// Step 4: Pinpoint rogue flags / alternate paths
+Object.defineProperty(financeRagService, 'useModernRAG', {
+  get() { return true; }, // Keep it true as per current logic
+  set(v) { console.warn('useModernRAG mutation ignored', v); return true; } // Prevent mutation and log
+});
+
+// Debug function for browser console
+(window as any).debugFinanceRAG = async () => {
+  const debugInfo = await financeRagService.getStoredChunksDebugInfo();
+  console.log('🔍 [Debug] Finance RAG Storage Info:', debugInfo);
+  return debugInfo;
+};
+
+// Step 5: Eliminate hot-reload artefacts
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    console.log('♻️ financeRagService HMR accept – full reload forced');
+    location.reload();
+  });
+} 

@@ -20,6 +20,13 @@ A professional ChatGPT-style chat interface designed for investment banking and 
 - **Dark Theme** - Professional dark theme optimized for financial professionals
 - **Responsive Design** - Works seamlessly on desktop and mobile devices
 
+### ✅ **Modern RAG Pipeline for Large Context Models**
+- **Hierarchical Chunking**: Documents are processed into parent and child chunks. Parent chunks provide broader context, while child chunks offer granular details for precise information retrieval. This structure is optimized for leveraging the extensive context windows of advanced models like GPT-4.1 (placeholder for actual large context model name).
+- **Full Document Storage**: In addition to chunks, the full text of processed documents is stored in a dedicated `processed_documents` table in Supabase. This enables retrieval strategies that can utilize entire documents or very large sections, feeding more holistic context to the LLM.
+- **Optimized for Deep Analysis**: By combining hierarchical chunks with the availability of full document text, the RAG pipeline can more effectively answer complex queries, perform cross-document analysis (future capability), and allow the LLM to synthesize information from a much wider understanding of the source material.
+- **Supabase Integration**: Leverages Supabase for robust storage of full documents, hierarchical chunks (with parent-child relationships correctly handled), and financial profiles extracted from documents.
+- **UUID-based Identifiers**: All document and chunk entities utilize UUIDs for consistent and reliable identification and linking.
+
 ### ✅ **Advanced Document Processing**
 - **LLMWhisperer Integration** - Professional OCR for financial documents
   - **High-Quality Text Extraction** - Superior to basic PDF parsing
